@@ -184,7 +184,6 @@ if(UNIX AND APPLE)
 		-D__PX4_POSIX
 		-D__PX4_DARWIN
 		-D__DF_DARWIN
-		-DCLOCK_MONOTONIC=1
 		-Dnoreturn_function=__attribute__\(\(noreturn\)\)
 		-include ${PX4_INCLUDE_DIR}visibility.h
                 )
@@ -193,13 +192,16 @@ if(UNIX AND APPLE)
           ${PX4_PTHREAD_BUILD}
 		)
 
+	if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8.0)
+		message(FATAL_ERROR "PX4 Firmware requires XCode 8 or newer on Mac OS. Version installed on this system: ${CMAKE_CXX_COMPILER_VERSION}")
+	endif()
+
 else()
 
         set(added_definitions
 		-D__PX4_POSIX
 		-D__PX4_LINUX
 		-D__DF_LINUX
-		-DCLOCK_MONOTONIC=1
 		-Dnoreturn_function=__attribute__\(\(noreturn\)\)
 		-include ${PX4_INCLUDE_DIR}visibility.h
                 )
