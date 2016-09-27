@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2015 PX4 Development Team. All rights reserved.
+ *   Copyright (C) 2013 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -17,7 +17,7 @@
  *    without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * AS IS AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
  * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
  * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
@@ -32,43 +32,11 @@
  ****************************************************************************/
 
 /**
- * @file gimbal_params.c
+ * nsh_romfsetc.h
  *
- * Parameters for the gimbal controller.
- *
- * @author Andreas Antener <andreas@uaventure.com>
+ * This file is a stub for 'make export' purposes; the actual ROMFS
+ * must be supplied by the library client.
  */
 
-#include <px4_config.h>
-
-#include <systemlib/param/param.h>
-
-/**
- * Consider mount operation mode.
- *
- * If set to 1, mount mode will be enforced.
- *
- * @boolean
- * @group Gimbal
- */
-PARAM_DEFINE_INT32(GMB_USE_MNT, 0);
-
-/**
- * Auxiliary switch to set mount operation mode.
- *
- * Set to 0 to disable manual mode control.
- *
- * If set to an auxiliary switch:
- * Switch off means the gimbal is put into safe/locked position.
- * Switch on means the gimbal can move freely, and landing gear
- * will be retracted if applicable.
- *
- * @value 0 Disable
- * @value 1 AUX1
- * @value 2 AUX2
- * @value 3 AUX3
- * @min 0
- * @max 3
- * @group Gimbal
- */
-PARAM_DEFINE_INT32(GMB_AUX_MNT_CHN, 0);
+extern unsigned char romfs_img[];
+extern unsigned int romfs_img_len;
