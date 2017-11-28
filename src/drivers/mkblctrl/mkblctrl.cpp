@@ -1236,7 +1236,7 @@ mk_start(unsigned motors, const char *device_path)
 
 	if (OK == g_mk->init(motors)) {
 		warnx("[mkblctrl] scanning i2c3...\n");
-		ret = g_mk->mk_check_for_blctrl(8, false, false);
+        ret = g_mk->mk_check_for_blctrl(8, true, false);
 
 		if (ret > 0) {
 			return OK;
@@ -1255,7 +1255,7 @@ mk_start(unsigned motors, const char *device_path)
 
 	if (OK == g_mk->init(motors)) {
 		warnx("[mkblctrl] scanning i2c1...\n");
-		ret = g_mk->mk_check_for_blctrl(8, false, false);
+        ret = g_mk->mk_check_for_blctrl(8, true, false);
 
 		if (ret > 0) {
 			return OK;
