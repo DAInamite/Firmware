@@ -594,7 +594,7 @@ MK::task_main()
 			orb_copy(ORB_ID(actuator_armed), _t_actuator_armed, &aa);
 
 			/* update PWM servo armed status if armed and not locked down */
-			mk_servo_arm(aa.armed && !aa.lockdown);
+			mk_servo_arm(aa.armed && !aa.lockdown && !aa.manual_lockdown);
 		}
 
 		/*
