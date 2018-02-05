@@ -1,4 +1,6 @@
-include(qurt/px4_impl_qurt)
+include(common/px4_git)
+px4_add_git_submodule(TARGET git_cmake_hexagon PATH "cmake/cmake_hexagon")
+
 
 if ("$ENV{HEXAGON_SDK_ROOT}" STREQUAL "")
 	message(FATAL_ERROR "Enviroment variable HEXAGON_SDK_ROOT must be set")
@@ -8,11 +10,25 @@ endif()
 
 set(CONFIG_SHMEM "1")
 
-set(config_generate_parameters_scope ALL)
+# Get $QC_SOC_TARGET from environment if existing.
+if (DEFINED ENV{QC_SOC_TARGET})
+	set(QC_SOC_TARGET $ENV{QC_SOC_TARGET})
+else()
+	set(QC_SOC_TARGET "APQ8074")
+endif()
 
-set(CMAKE_TOOLCHAIN_FILE ${PX4_SOURCE_DIR}/cmake/cmake_hexagon/toolchain/Toolchain-qurt.cmake)
+# Disable the creation of the parameters.xml file by scanning individual
+# source files, and scan all source files.  This will create a parameters.xml
+# file that contains all possible parameters, even if the associated module
+# is not used.  This is necessary for parameter synchronization between the
+# ARM and DSP processors.
+set(DISABLE_PARAMS_MODULE_SCOPING TRUE)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PX4_SOURCE_DIR}/cmake/cmake_hexagon")
+include(toolchain/Toolchain-qurt)
+include(qurt_flags)
+include_directories(${HEXAGON_SDK_INCLUDES})
+
 
 set(config_module_list
 	#
@@ -25,6 +41,7 @@ set(config_module_list
 	platforms/posix/drivers/df_hmc5883_wrapper
 	platforms/posix/drivers/df_trone_wrapper
 	platforms/posix/drivers/df_isl29501_wrapper
+	platforms/posix/drivers/df_ltc2946_wrapper
 
 	#
 	# System commands
@@ -48,9 +65,8 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/param
+	modules/systemlib/param
 	modules/systemlib
-	modules/systemlib/mixer
 	modules/uORB
 	modules/commander
 	modules/land_detector
@@ -59,30 +75,24 @@ set(config_module_list
 	# PX4 drivers
 	#
 	drivers/gps
-	drivers/pwm_out_rc_in
+	drivers/spektrum_rc
 	drivers/qshell/qurt
+	drivers/snapdragon_pwm_out
 
 	#
 	# Libraries
 	#
 	lib/controllib
-	lib/mathlib
-	lib/mathlib/math/filter
-	lib/geo
-	lib/ecl
-	lib/geo_lookup
 	lib/conversion
-	lib/terrain_estimation
-	lib/runway_takeoff
-	lib/tailsitter_recovery
 	lib/DriverFramework/framework
-
-	#
-	# QuRT port
-	#
-	platforms/common
-	platforms/qurt/px4_layer
-	platforms/posix/work_queue
+	lib/ecl
+	lib/geo
+	lib/geo_lookup
+	lib/mathlib
+	lib/mixer
+	lib/rc
+	lib/terrain_estimation
+	lib/version
 
 	#
 	# sources for muorb over fastrpc
@@ -96,4 +106,5 @@ set(config_df_driver_list
 	hmc5883
 	trone
 	isl29501
+	ltc2946
 	)

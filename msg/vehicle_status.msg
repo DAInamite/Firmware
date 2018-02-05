@@ -33,7 +33,8 @@ uint8 NAVIGATION_STATE_RATTITUDE = 16		# Rattitude (aka "flip") mode
 uint8 NAVIGATION_STATE_AUTO_TAKEOFF = 17	# Takeoff
 uint8 NAVIGATION_STATE_AUTO_LAND = 18		# Land
 uint8 NAVIGATION_STATE_AUTO_FOLLOW_TARGET = 19	# Auto Follow
-uint8 NAVIGATION_STATE_MAX = 20
+uint8 NAVIGATION_STATE_AUTO_PRECLAND = 20	# Precision land with landing target
+uint8 NAVIGATION_STATE_MAX = 21
 
 uint8 RC_IN_MODE_DEFAULT = 0
 uint8 RC_IN_MODE_OFF = 1
@@ -48,12 +49,12 @@ uint8 hil_state				# current hil state
 bool failsafe				# true if system is in failsafe state
 
 uint8 system_type			# system type, contains mavlink MAV_TYPE
-uint32 system_id			# system id, contains MAVLink's system ID field
-uint32 component_id			# subsystem / component id, contains MAVLink's component ID field
+uint8 system_id			# system id, contains MAVLink's system ID field
+uint8 component_id			# subsystem / component id, contains MAVLink's component ID field
 
 bool is_rotary_wing			# True if system is in rotary wing configuration, so for a VTOL this is only true while flying as a multicopter
 bool is_vtol				# True if the system is VTOL capable
-bool vtol_fw_permanent_stab		# True if vtol should stabilize attitude for fw in manual mode
+bool vtol_fw_permanent_stab		# True if VTOL should stabilize attitude for fw in manual mode
 bool in_transition_mode			# True if VTOL is doing a transition
 bool in_transition_to_fw		# True if VTOL is doing a transition from MC to FW
 
@@ -63,7 +64,6 @@ uint8 rc_input_mode				# set to 1 to disable the RC input, 2 to enable manual co
 bool data_link_lost				# datalink to GCS lost
 uint8 data_link_lost_counter			# counts unique data link lost events
 bool engine_failure				# Set to true if an engine failure is detected
-bool engine_failure_cmd				# Set to true if an engine failure mode is commanded
 bool mission_failure				# Set to true if mission could not continue/finish
 
 # see SYS_STATUS mavlink message for the following

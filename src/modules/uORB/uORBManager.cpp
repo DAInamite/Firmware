@@ -131,18 +131,38 @@ int uORB::Manager::orb_exists(const struct orb_metadata *meta, int instance)
 		return ERROR;
 	}
 
-#ifdef __PX4_NUTTX
+#if defined(__PX4_NUTTX)
 	struct stat buffer;
-	return stat(path, &buffer);
+	ret = stat(path, &buffer);
 #else
-	return px4_access(path, F_OK);
-#endif
-}
+	ret = px4_access(path, F_OK);
 
-orb_advert_t uORB::Manager::orb_advertise(const struct orb_metadata *meta, const void *data, unsigned int queue_size)
-{
-	//warnx("orb_advertise meta = %p", meta);
-	return orb_advertise_multi(meta, data, nullptr, ORB_PRIO_DEFAULT, queue_size);
+	if (ret == -1 && meta != nullptr && !_remote_topics.empty()) {
+		ret = (_remote_topics.find(meta->o_name) != _remote_topics.end()) ? OK : ERROR;
+	}
+
+#endif
+
+	if (ret == 0) {
+		// we know the topic exists, but it's not necessarily advertised/published yet (for example
+		// if there is only a subscriber)
+		// The open() will not lead to memory allocations.
+		int fd = px4_open(path, 0);
+
+		if (fd >= 0) {
+			unsigned long is_published;
+
+			if (px4_ioctl(fd, ORBIOCISPUBLISHED, (unsigned long)&is_published) == 0) {
+				if (!is_published) {
+					ret = ERROR;
+				}
+			}
+
+			px4_close(fd);
+		}
+	}
+
+	return ret;
 }
 
 orb_advert_t uORB::Manager::orb_advertise_multi(const struct orb_metadata *meta, const void *data, int *instance,
@@ -175,13 +195,11 @@ orb_advert_t uORB::Manager::orb_advertise_multi(const struct orb_metadata *meta,
 	int result, fd;
 	orb_advert_t advertiser;
 
-	//warnx("orb_advertise_multi meta = %p\n", meta);
-
 	/* open the node as an advertiser */
 	fd = node_open(PUBSUB, meta, data, true, instance, priority);
 
 	if (fd == ERROR) {
-		warnx("node_open as advertiser failed.");
+		PX4_ERR("%s advertise failed", meta->o_name);
 		return nullptr;
 	}
 
@@ -199,15 +217,18 @@ orb_advert_t uORB::Manager::orb_advertise_multi(const struct orb_metadata *meta,
 	px4_close(fd);
 
 	if (result == ERROR) {
-		warnx("px4_ioctl ORBIOCGADVERTISER  failed. fd = %d", fd);
+		PX4_WARN("px4_ioctl ORBIOCGADVERTISER failed. fd = %d", fd);
 		return nullptr;
 	}
+
+	//For remote systems call over and inform them
+	uORB::DeviceNode::topic_advertised(meta, priority);
 
 	/* the advertiser must perform an initial publish to initialise the object */
 	result = orb_publish(meta, advertiser, data);
 
 	if (result == ERROR) {
-		warnx("orb_publish failed");
+		PX4_WARN("orb_publish failed");
 		return nullptr;
 	}
 
@@ -414,6 +435,17 @@ int uORB::Manager::node_open
 		}
 	}
 
+	/*
+	 else if (advertiser) {
+		 * We have a valid fd and are an advertiser.
+		 * This can happen if the topic is already subscribed/published, and orb_advertise() is called,
+		 * where instance==nullptr.
+		 * We would need to set the priority here (via px4_ioctl(fd, ...) and a new IOCTL), but orb_advertise()
+		 * uses ORB_PRIO_DEFAULT, and a subscriber also creates the node with ORB_PRIO_DEFAULT. So we don't need
+		 * to do anything here.
+	 }
+	 */
+
 	if (fd < 0) {
 		errno = EIO;
 		return ERROR;
@@ -434,9 +466,25 @@ void uORB::Manager::set_uorb_communicator(uORBCommunicator::IChannel *channel)
 	}
 }
 
-uORBCommunicator::IChannel *uORB::Manager::get_uorb_communicator(void)
+uORBCommunicator::IChannel *uORB::Manager::get_uorb_communicator()
 {
 	return _comm_channel;
+}
+
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+int16_t uORB::Manager::process_remote_topic(const char *topic_name, bool isAdvertisement)
+{
+	int16_t rc = 0;
+
+	if (isAdvertisement) {
+		_remote_topics.insert(topic_name);
+
+	} else {
+		_remote_topics.erase(topic_name);
+	}
+
+	return rc;
 }
 
 //-----------------------------------------------------------------------------
@@ -476,8 +524,6 @@ int16_t uORB::Manager::process_add_subscription(const char *messageName,
 int16_t uORB::Manager::process_remove_subscription(
 	const char *messageName)
 {
-	warnx("[posix-uORB::Manager::process_remove_subscription(%d)] Enter: name: %s",
-	      __LINE__, messageName);
 	int16_t rc = -1;
 	_remote_subscriber_topics.erase(messageName);
 	char nodepath[orb_maxpath];
@@ -507,8 +553,6 @@ int16_t uORB::Manager::process_remove_subscription(
 int16_t uORB::Manager::process_received_message(const char *messageName,
 		int32_t length, uint8_t *data)
 {
-	//warnx("[uORB::Manager::process_received_message(%d)] Enter name: %s", __LINE__, messageName );
-
 	int16_t rc = -1;
 	char nodepath[orb_maxpath];
 	int ret = uORB::Utils::node_mkpath(nodepath, PUBSUB, messageName);

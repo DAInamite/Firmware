@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2013-2015 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2013-2018 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -45,39 +45,35 @@
 #ifndef NAVIGATOR_MISSION_H
 #define NAVIGATOR_MISSION_H
 
-#include <drivers/drv_hrt.h>
-
-#include <controllib/blocks.hpp>
-#include <controllib/block/BlockParam.hpp>
-
-#include <dataman/dataman.h>
-
-#include <uORB/uORB.h>
-#include <uORB/topics/vehicle_global_position.h>
-#include <uORB/topics/position_setpoint_triplet.h>
-#include <uORB/topics/home_position.h>
-#include <uORB/topics/vehicle_status.h>
-#include <uORB/topics/mission.h>
-#include <uORB/topics/mission_result.h>
-
-#include "navigator_mode.h"
 #include "mission_block.h"
 #include "mission_feasibility_checker.h"
+#include "navigator_mode.h"
+
+#include <cfloat>
+
+#include <dataman/dataman.h>
+#include <drivers/drv_hrt.h>
+#include <uORB/topics/home_position.h>
+#include <uORB/topics/mission.h>
+#include <uORB/topics/mission_result.h>
+#include <uORB/topics/position_setpoint_triplet.h>
+#include <uORB/topics/vehicle_global_position.h>
+#include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/vehicle_roi.h>
+#include <uORB/uORB.h>
 
 class Navigator;
 
-class Mission : public MissionBlock
+class Mission final : public MissionBlock
 {
 public:
 	Mission(Navigator *navigator, const char *name);
+	~Mission() override = default;
 
-	virtual ~Mission();
-
-	virtual void on_inactive();
-
-	virtual void on_activation();
-
-	virtual void on_active();
+	void on_inactive() override;
+	void on_inactivation() override;
+	void on_activation() override;
+	void on_active() override;
 
 	enum mission_altitude_mode {
 		MISSION_ALTMODE_ZOH = 0,
@@ -92,11 +88,14 @@ public:
 		MISSION_YAWMODE_MAX = 4
 	};
 
+	bool set_current_offboard_mission_index(uint16_t index);
+
+	bool land_start();
+	bool landing();
+
+	uint16_t get_land_start_index() const { return _land_start_index; }
+
 private:
-	/**
-	 * Update onboard mission topic
-	 */
-	void update_onboard_mission();
 
 	/**
 	 * Update offboard mission topic
@@ -109,12 +108,6 @@ private:
 	void advance_mission();
 
 	/**
-	 * Check distance to first waypoint (with lat/lon)
-	 * @return true only if it's not too far from home (< MIS_DIST_1WP)
-	 */
-	bool check_dist_1wp();
-
-	/**
 	 * Set new mission items
 	 */
 	void set_mission_items();
@@ -122,7 +115,7 @@ private:
 	/**
 	 * Returns true if we need to do a takeoff at the current state
 	 */
-	bool do_need_takeoff();
+	bool do_need_vertical_takeoff();
 
 	/**
 	 * Returns true if we need to move to waypoint location before starting descent
@@ -160,9 +153,9 @@ private:
 	void altitude_sp_foh_update();
 
 	/**
-	 * Resets the altitude sp foh logic
+	 * Update the cruising speed setpoint.
 	 */
-	void altitude_sp_foh_reset();
+	void cruising_speed_sp_update();
 
 	/**
 	 * Abort landing
@@ -177,8 +170,8 @@ private:
 	 *
 	 * @return true if current mission item available
 	 */
-	bool prepare_mission_items(bool onboard, struct mission_item_s *mission_item,
-		struct mission_item_s *next_position_mission_item, bool *has_next_position_item);
+	bool prepare_mission_items(mission_item_s *mission_item, mission_item_s *next_position_mission_item,
+				   bool *has_next_position_item);
 
 	/**
 	 * Read current (offset == 0) or a specific (offset > 0) mission item
@@ -186,7 +179,7 @@ private:
 	 *
 	 * @return true if successful
 	 */
-	bool read_mission_item(bool onboard, int offset, struct mission_item_s *mission_item);
+	bool read_mission_item(int offset, mission_item_s *mission_item);
 
 	/**
 	 * Save current offboard mission state to dataman
@@ -209,12 +202,7 @@ private:
 	void set_current_offboard_mission_item();
 
 	/**
-	 * Set that the mission is finished if one exists or that none exists
-	 */
-	void set_mission_finished();
-
-	/**
-	 * Check wether a mission is ready to go
+	 * Check whether a mission is ready to go
 	 */
 	void check_mission_valid(bool force);
 
@@ -229,37 +217,44 @@ private:
 	 */
 	bool need_to_reset_mission(bool active);
 
-	control::BlockParamInt _param_onboard_enabled;
-	control::BlockParamFloat _param_takeoff_alt;
+	/**
+	 * Project current location with heading to far away location and fill setpoint.
+	 */
+	void generate_waypoint_from_heading(struct position_setpoint_s *setpoint, float yaw);
+
+	/**
+	 * Find and store the index of the landing sequence (DO_LAND_START)
+	 */
+	bool find_offboard_land_start();
+
 	control::BlockParamFloat _param_dist_1wp;
+	control::BlockParamFloat _param_dist_between_wps;
 	control::BlockParamInt _param_altmode;
 	control::BlockParamInt _param_yawmode;
-	control::BlockParamInt _param_force_vtol;
-	control::BlockParamFloat _param_fw_climbout_diff;
+	control::BlockParamInt _param_mnt_yaw_ctl;
 
-	struct mission_s _onboard_mission;
-	struct mission_s _offboard_mission;
+	struct mission_s _offboard_mission {};
 
-	int _current_onboard_mission_index;
-	int _current_offboard_mission_index;
-	bool _need_takeoff;					/**< if true, then takeoff must be performed before going to the first waypoint (if needed) */
+	int32_t _current_offboard_mission_index{-1};
+
+	// track location of planned mission landing
+	bool	_land_start_available{false};
+	uint16_t _land_start_index{UINT16_MAX};		/**< index of DO_LAND_START, INVALID_DO_LAND_START if no planned landing */
+
+	bool _need_takeoff{true};					/**< if true, then takeoff must be performed before going to the first waypoint (if needed) */
 
 	enum {
 		MISSION_TYPE_NONE,
-		MISSION_TYPE_ONBOARD,
 		MISSION_TYPE_OFFBOARD
-	} _mission_type;
+	} _mission_type{MISSION_TYPE_NONE};
 
-	bool _inited;
-	bool _home_inited;
-	bool _need_mission_reset;
+	bool _inited{false};
+	bool _home_inited{false};
+	bool _need_mission_reset{false};
 
-	MissionFeasibilityChecker _missionFeasibilityChecker; /**< class that checks if a mission is feasible */
+	float _min_current_sp_distance_xy{FLT_MAX}; /**< minimum distance which was achieved to the current waypoint  */
 
-	float _min_current_sp_distance_xy; /**< minimum distance which was achieved to the current waypoint  */
-
-	float _on_arrival_yaw; /**< holds the yaw value that should be applied when the current waypoint is reached */
-	float _distance_current_previous; /**< distance from previous to current sp in pos_sp_triplet,
+	float _distance_current_previous{0.0f}; /**< distance from previous to current sp in pos_sp_triplet,
 					    only use if current and previous are valid */
 
 	enum work_item_type {
@@ -267,12 +262,11 @@ private:
 		WORK_ITEM_TYPE_TAKEOFF,		/**< takeoff before moving to waypoint */
 		WORK_ITEM_TYPE_MOVE_TO_LAND,	/**< move to land waypoint before descent */
 		WORK_ITEM_TYPE_ALIGN,		/**< align for next waypoint */
-		WORK_ITEM_TYPE_CMD_BEFORE_MOVE,	/**<  */
-		WORK_ITEM_TYPE_TRANSITON_AFTER_TAKEOFF,	/**<  */
-		WORK_ITEM_TYPE_TRANSITON_BEFORE_LAND,	/**<  */
-		WORK_ITEM_TYPE_MOVE_TO_LAND_AFTER_TRANSITION	/**<  */
-	} _work_item_type;	/**< current type of work to do (sub mission item) */
-
+		WORK_ITEM_TYPE_CMD_BEFORE_MOVE,
+		WORK_ITEM_TYPE_TRANSITON_AFTER_TAKEOFF,
+		WORK_ITEM_TYPE_MOVE_TO_LAND_AFTER_TRANSITION,
+		WORK_ITEM_TYPE_PRECISION_LAND
+	} _work_item_type{WORK_ITEM_TYPE_DEFAULT};	/**< current type of work to do (sub mission item) */
 };
 
 #endif

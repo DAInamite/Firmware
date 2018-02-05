@@ -45,9 +45,9 @@ px4_add_module(
 	MAIN uorb_tests
 	STACK_MAIN 2048
 	COMPILE_FLAGS
-		-Os
+		-Wno-sign-compare # TODO: fix all sign-compare
 	SRCS ${SRCS}
 	DEPENDS
 		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix : 
+# vim: set noet ft=cmake fenc=utf-8 ff=unix :

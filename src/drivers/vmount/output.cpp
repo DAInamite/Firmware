@@ -42,10 +42,13 @@
 #include <errno.h>
 
 #include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_global_position.h>
+#include <uORB/topics/mount_orientation.h>
 #include <px4_defines.h>
 #include <geo/geo.h>
 #include <math.h>
+#include <mathlib/mathlib.h>
 
 namespace vmount
 {
@@ -65,6 +68,10 @@ OutputBase::~OutputBase()
 	if (_vehicle_global_position_sub >= 0) {
 		orb_unsubscribe(_vehicle_global_position_sub);
 	}
+
+	if (_mount_orientation_pub) {
+		orb_unadvertise(_mount_orientation_pub);
+	}
 }
 
 int OutputBase::initialize()
@@ -78,6 +85,23 @@ int OutputBase::initialize()
 	}
 
 	return 0;
+}
+
+void OutputBase::publish()
+{
+	int instance;
+	mount_orientation_s mount_orientation;
+
+	for (unsigned i = 0; i < 3; ++i) {
+		mount_orientation.attitude_euler_angle[i] = _angle_outputs[i];
+	}
+
+	//PX4_INFO("roll: %.2f, pitch: %.2f, yaw: %.2f",
+	//		(double)_angle_outputs[0],
+	//		(double)_angle_outputs[1],
+	//		(double)_angle_outputs[2]);
+
+	orb_publish_auto(ORB_ID(mount_orientation), &_mount_orientation_pub, &mount_orientation, &instance, ORB_PRIO_DEFAULT);
 }
 
 float OutputBase::_calculate_pitch(double lon, double lat, float altitude,
@@ -163,7 +187,8 @@ void OutputBase::_handle_position_update(bool force_update)
 	}
 
 	float roll = _cur_control_data->type_data.lonlat.roll_angle;
-	float yaw = get_bearing_to_next_waypoint(vehicle_global_position.lat, vehicle_global_position.lon, lat, lon);
+	float yaw = get_bearing_to_next_waypoint(vehicle_global_position.lat, vehicle_global_position.lon, lat, lon)
+		    - vehicle_global_position.yaw;
 
 	_angle_setpoints[0] = roll;
 	_angle_setpoints[1] = pitch;
@@ -186,11 +211,11 @@ void OutputBase::_calculate_output_angles(const hrt_abstime &t)
 		orb_copy(ORB_ID(vehicle_attitude), _vehicle_attitude_sub, &vehicle_attitude);
 	}
 
-	float att[3] = { vehicle_attitude.roll, vehicle_attitude.pitch, vehicle_attitude.yaw };
+	matrix::Eulerf euler = matrix::Quatf(vehicle_attitude.q);
 
 	for (int i = 0; i < 3; ++i) {
 		if (_stabilize[i]) {
-			_angle_outputs[i] = _angle_setpoints[i] - att[i];
+			_angle_outputs[i] = _angle_setpoints[i] - euler(i);
 
 		} else {
 			_angle_outputs[i] = _angle_setpoints[i];

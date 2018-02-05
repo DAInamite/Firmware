@@ -223,12 +223,14 @@
 #define BMI_GYRO_NORMAL_MODE    0x15 //Wait at least 80 ms before another CMD
 #define BMI160_SOFT_RESET       0xB6
 
-#define BMI160_ACCEL_DEFAULT_RANGE_G		4
+#define BMI160_ACCEL_DEFAULT_RANGE_G		16
 #define BMI160_GYRO_DEFAULT_RANGE_DPS		2000
 #define BMI160_ACCEL_DEFAULT_RATE           800
 #define BMI160_ACCEL_MAX_RATE               1600
+#define BMI160_ACCEL_MAX_PUBLISH_RATE       280
 #define BMI160_GYRO_DEFAULT_RATE            800
 #define BMI160_GYRO_MAX_RATE                3200
+#define BMI160_GYRO_MAX_PUBLISH_RATE        BMI160_ACCEL_MAX_PUBLISH_RATE
 
 #define BMI160_ACCEL_DEFAULT_ONCHIP_FILTER_FREQ	324
 #define BMI160_ACCEL_DEFAULT_DRIVER_FILTER_FREQ	50
@@ -238,24 +240,16 @@
 
 #define BMI160_ONE_G                       9.80665f
 
-#define BMI160_LOW_BUS_SPEED				1000*1000
-#define BMI160_HIGH_BUS_SPEED				11*1000*1000
+#define BMI160_BUS_SPEED				10*1000*1000
 
 #define BMI160_TIMER_REDUCTION				200
-
-#ifdef PX4_SPI_BUS_EXT
-#define EXTERNAL_BUS PX4_SPI_BUS_EXT
-#else
-#define EXTERNAL_BUS 0
-#endif
-
 
 class BMI160_gyro;
 
 class BMI160 : public device::SPI
 {
 public:
-	BMI160(int bus, const char *path_accel, const char *path_gyro, spi_dev_e device, enum Rotation rotation);
+	BMI160(int bus, const char *path_accel, const char *path_gyro, uint32_t device, enum Rotation rotation);
 	virtual ~BMI160();
 
 	virtual int		init();
@@ -387,7 +381,7 @@ private:
 	 * @param		The register to read.
 	 * @return		The value that was read.
 	 */
-	uint8_t			read_reg(unsigned reg, uint32_t speed = BMI160_LOW_BUS_SPEED);
+	uint8_t			read_reg(unsigned reg);
 	uint16_t		read_reg16(unsigned reg);
 
 	/**
@@ -431,13 +425,6 @@ private:
 	 * Swap a 16-bit value read from the BMI160 to native byte order.
 	 */
 	uint16_t		swap16(uint16_t val) { return (val >> 8) | (val << 8);	}
-
-	/**
-	 * Get the internal / external state
-	 *
-	 * @return true if the sensor is not on the main MCU board
-	 */
-	bool			is_external() { return (_bus == EXTERNAL_BUS); }
 
 	/**
 	 * Measurement self test

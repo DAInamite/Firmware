@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- *   Copyright (c) 2016 PX4 Development Team. All rights reserved.
+ *   Copyright (c) 2016, 2017 PX4 Development Team. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -68,50 +68,58 @@ public:
 	/**
 	 * Get the battery cell count
 	 */
-	int cell_count() { return _param_n_cells.get(); }
+	int cell_count() { return _n_cells.get(); }
 
 	/**
 	 * Get the empty voltage per cell
 	 */
-	float empty_cell_voltage() { return _param_v_empty.get(); }
+	float empty_cell_voltage() { return _v_empty.get(); }
 
 	/**
 	 * Get the full voltage per cell
 	 */
-	float full_cell_voltage() { return _param_v_full.get(); }
+	float full_cell_voltage() { return _v_charged.get(); }
 
 	/**
 	 * Update current battery status message.
 	 *
 	 * @param voltage_v: current voltage in V
 	 * @param current_a: current current in A
+	 * @param connected: Battery is connected
+	 * @param selected_source: This battery is on the brick that the selected source for selected_source
+	 * @param priority: The brick number -1. The term priority refers to the Vn connection on the LTC4417
 	 * @param throttle_normalized: throttle from 0 to 1
 	 */
-	void updateBatteryStatus(hrt_abstime timestamp, float voltage_v, float current_a, float throttle_normalized,
+	void updateBatteryStatus(hrt_abstime timestamp, float voltage_v, float current_a,
+				 bool connected, bool selected_source, int priority,
+				 float throttle_normalized,
 				 bool armed, battery_status_s *status);
 
 private:
 	void filterVoltage(float voltage_v);
 	void filterCurrent(float current_a);
 	void sumDischarged(hrt_abstime timestamp, float current_a);
-	void estimateRemaining(float voltage_v, float throttle_normalized, bool armed);
-	void determineWarning();
+	void estimateRemaining(float voltage_v, float current_a, float throttle_normalized, bool armed);
+	void determineWarning(bool connected);
+	void computeScale();
 
-	control::BlockParamFloat _param_v_empty;
-	control::BlockParamFloat _param_v_full;
-	control::BlockParamInt _param_n_cells;
-	control::BlockParamFloat _param_capacity;
-	control::BlockParamFloat _param_v_load_drop;
-	control::BlockParamFloat _param_low_thr;
-	control::BlockParamFloat _param_crit_thr;
+	control::BlockParamFloat _v_empty;
+	control::BlockParamFloat _v_charged;
+	control::BlockParamInt _n_cells;
+	control::BlockParamFloat _capacity;
+	control::BlockParamFloat _v_load_drop;
+	control::BlockParamFloat _r_internal;
+	control::BlockParamFloat _low_thr;
+	control::BlockParamFloat _crit_thr;
+	control::BlockParamFloat _emergency_thr;
 
 	float _voltage_filtered_v;
 	float _current_filtered_a;
 	float _discharged_mah;
+	float _discharged_mah_loop;
 	float _remaining_voltage;		///< normalized battery charge level remaining based on voltage
-	float _remaining_capacity;		///< normalized battery charge level remaining based on capacity
 	float _remaining;			///< normalized battery charge level, selected based on config param
+	float _scale;
 	uint8_t _warning;
 	hrt_abstime _last_timestamp;
 };
-

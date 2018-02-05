@@ -37,9 +37,6 @@ px4_add_module(
 		crazyflie_usb.c
 		crazyflie_led.c
 		crazyflie_timer_config.c
-		crazyflie_i2c.cpp
-		crazyflie_spi.c
 	DEPENDS
 		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix :

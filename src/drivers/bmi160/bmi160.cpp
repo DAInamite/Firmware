@@ -18,8 +18,8 @@ const uint8_t BMI160::_checked_registers[BMI160_NUM_CHECKED_REGISTERS] = {    BM
 									      BMIREG_NV_CONF
 									 };
 
-BMI160::BMI160(int bus, const char *path_accel, const char *path_gyro, spi_dev_e device, enum Rotation rotation) :
-	SPI("BMI160", path_accel, bus, device, SPIDEV_MODE3, BMI160_LOW_BUS_SPEED),
+BMI160::BMI160(int bus, const char *path_accel, const char *path_gyro, uint32_t device, enum Rotation rotation) :
+	SPI("BMI160", path_accel, bus, device, SPIDEV_MODE3, BMI160_BUS_SPEED),
 	_gyro(new BMI160_gyro(this, path_gyro)),
 	_whoami(0),
 	_call{},
@@ -55,8 +55,8 @@ BMI160::BMI160(int bus, const char *path_accel, const char *path_gyro, spi_dev_e
 	_gyro_filter_x(BMI160_GYRO_DEFAULT_RATE, BMI160_GYRO_DEFAULT_DRIVER_FILTER_FREQ),
 	_gyro_filter_y(BMI160_GYRO_DEFAULT_RATE, BMI160_GYRO_DEFAULT_DRIVER_FILTER_FREQ),
 	_gyro_filter_z(BMI160_GYRO_DEFAULT_RATE, BMI160_GYRO_DEFAULT_DRIVER_FILTER_FREQ),
-	_accel_int(1000000 / BMI160_ACCEL_MAX_RATE),
-	_gyro_int(1000000 / BMI160_GYRO_MAX_RATE, true),
+	_accel_int(1000000 / BMI160_ACCEL_MAX_PUBLISH_RATE),
+	_gyro_int(1000000 / BMI160_GYRO_MAX_PUBLISH_RATE, true),
 	_rotation(rotation),
 	_checked_next(0),
 	_last_temperature(0),
@@ -190,7 +190,7 @@ BMI160::init()
 
 	/* measurement will have generated a report, publish */
 	_accel_topic = orb_advertise_multi(ORB_ID(sensor_accel), &arp,
-					   &_accel_orb_class_instance, (is_external()) ? ORB_PRIO_MAX - 1 : ORB_PRIO_HIGH - 1);
+					   &_accel_orb_class_instance, (external()) ? ORB_PRIO_MAX - 1 : ORB_PRIO_HIGH - 1);
 
 	if (_accel_topic == nullptr) {
 		warnx("ADVERT FAIL");
@@ -202,7 +202,7 @@ BMI160::init()
 	_gyro_reports->get(&grp);
 
 	_gyro->_gyro_topic = orb_advertise_multi(ORB_ID(sensor_gyro), &grp,
-			     &_gyro->_gyro_orb_class_instance, (is_external()) ? ORB_PRIO_MAX - 1 : ORB_PRIO_HIGH - 1);
+			     &_gyro->_gyro_orb_class_instance, (external()) ? ORB_PRIO_MAX - 1 : ORB_PRIO_HIGH - 1);
 
 	if (_gyro->_gyro_topic == nullptr) {
 		warnx("ADVERT FAIL");
@@ -303,10 +303,6 @@ BMI160::accel_set_sample_rate(float frequency)
 	if (frequency <= 25 / 32) {
 		setbits |= BMI_ACCEL_RATE_25_32;
 		_accel_sample_rate = 25 / 32;
-
-	} else if (frequency <= 25 / 16) {
-		setbits |= BMI_ACCEL_RATE_25_16;
-		_accel_sample_rate = 25 / 16;
 
 	} else if (frequency <= 25 / 16) {
 		setbits |= BMI_ACCEL_RATE_25_16;
@@ -504,31 +500,6 @@ BMI160::accel_self_test()
 		return 1;
 	}
 
-	/* inspect accel offsets */
-	if (fabsf(_accel_scale.x_offset) < 0.000001f) {
-		return 1;
-	}
-
-	if (fabsf(_accel_scale.x_scale - 1.0f) > 0.4f || fabsf(_accel_scale.x_scale - 1.0f) < 0.000001f) {
-		return 1;
-	}
-
-	if (fabsf(_accel_scale.y_offset) < 0.000001f) {
-		return 1;
-	}
-
-	if (fabsf(_accel_scale.y_scale - 1.0f) > 0.4f || fabsf(_accel_scale.y_scale - 1.0f) < 0.000001f) {
-		return 1;
-	}
-
-	if (fabsf(_accel_scale.z_offset) < 0.000001f) {
-		return 1;
-	}
-
-	if (fabsf(_accel_scale.z_scale - 1.0f) > 0.4f || fabsf(_accel_scale.z_scale - 1.0f) < 0.000001f) {
-		return 1;
-	}
-
 	return 0;
 }
 
@@ -573,14 +544,6 @@ BMI160::gyro_self_test()
 	}
 
 	if (fabsf(_gyro_scale.z_scale - 1.0f) > max_scale) {
-		return 1;
-	}
-
-	/* check if all scales are zero */
-	if ((fabsf(_gyro_scale.x_offset) < 0.000001f) &&
-	    (fabsf(_gyro_scale.y_offset) < 0.000001f) &&
-	    (fabsf(_gyro_scale.z_offset) < 0.000001f)) {
-		/* if all are zero, this device is not calibrated */
 		return 1;
 	}
 
@@ -670,12 +633,10 @@ BMI160::ioctl(struct file *filp, int cmd, unsigned long arg)
 			case SENSOR_POLLRATE_DEFAULT:
 				if (BMI160_GYRO_DEFAULT_RATE > BMI160_ACCEL_DEFAULT_RATE) {
 					return ioctl(filp, SENSORIOCSPOLLRATE, BMI160_GYRO_DEFAULT_RATE);
-					warnx("GYROOOOOOOOO");
 
 				} else {
 					return ioctl(filp, SENSORIOCSPOLLRATE,
 						     BMI160_ACCEL_DEFAULT_RATE); //Polling at the highest frequency. We may get duplicate values on the sensors
-					warnx("ACCELLLLLLLLLLLL");
 				}
 
 			/* adjust to a legal polling interval in Hz */
@@ -753,24 +714,11 @@ BMI160::ioctl(struct file *filp, int cmd, unsigned long arg)
 			return OK;
 		}
 
-	case SENSORIOCGQUEUEDEPTH:
-		return _accel_reports->size();
-
 	case ACCELIOCGSAMPLERATE:
 		return _accel_sample_rate;
 
 	case ACCELIOCSSAMPLERATE:
 		return accel_set_sample_rate(arg);
-
-	case ACCELIOCGLOWPASS:
-		return _accel_filter_x.get_cutoff_freq();
-
-	case ACCELIOCSLOWPASS:
-		// set software filtering
-		_accel_filter_x.set_cutoff_frequency(1.0e6f / _call_interval, arg);
-		_accel_filter_y.set_cutoff_frequency(1.0e6f / _call_interval, arg);
-		_accel_filter_z.set_cutoff_frequency(1.0e6f / _call_interval, arg);
-		return OK;
 
 	case ACCELIOCSSCALE: {
 			/* copy scale, but only if off by a few percent */
@@ -799,20 +747,6 @@ BMI160::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCSELFTEST:
 		return accel_self_test();
-
-#ifdef ACCELIOCSHWLOWPASS
-
-	case ACCELIOCSHWLOWPASS:
-		_set_dlpf_filter(arg);
-		return OK;
-#endif
-
-#ifdef ACCELIOCGHWLOWPASS
-
-	case ACCELIOCGHWLOWPASS:
-		return _dlpf_freq;
-#endif
-
 
 	default:
 		/* give it to the superclass */
@@ -849,24 +783,11 @@ BMI160::gyro_ioctl(struct file *filp, int cmd, unsigned long arg)
 			return OK;
 		}
 
-	case SENSORIOCGQUEUEDEPTH:
-		return _gyro_reports->size();
-
 	case GYROIOCGSAMPLERATE:
 		return _gyro_sample_rate;
 
 	case GYROIOCSSAMPLERATE:
 		return gyro_set_sample_rate(arg);
-
-	case GYROIOCGLOWPASS:
-		return _gyro_filter_x.get_cutoff_freq();
-
-	case GYROIOCSLOWPASS:
-		// set software filtering
-		_gyro_filter_x.set_cutoff_frequency(1.0e6f / _call_interval, arg);
-		_gyro_filter_y.set_cutoff_frequency(1.0e6f / _call_interval, arg);
-		_gyro_filter_z.set_cutoff_frequency(1.0e6f / _call_interval, arg);
-		return OK;
 
 	case GYROIOCSSCALE:
 		/* copy scale in */
@@ -887,19 +808,6 @@ BMI160::gyro_ioctl(struct file *filp, int cmd, unsigned long arg)
 	case GYROIOCSELFTEST:
 		return gyro_self_test();
 
-#ifdef GYROIOCSHWLOWPASS
-
-	case GYROIOCSHWLOWPASS:
-		_set_dlpf_filter(arg);
-		return OK;
-#endif
-
-#ifdef GYROIOCGHWLOWPASS
-
-	case GYROIOCGHWLOWPASS:
-		return _dlpf_freq;
-#endif
-
 	default:
 		/* give it to the superclass */
 		return SPI::ioctl(filp, cmd, arg);
@@ -907,12 +815,9 @@ BMI160::gyro_ioctl(struct file *filp, int cmd, unsigned long arg)
 }
 
 uint8_t
-BMI160::read_reg(unsigned reg, uint32_t speed)
+BMI160::read_reg(unsigned reg)
 {
 	uint8_t cmd[2] = { (uint8_t)(reg | DIR_READ), 0};
-
-	// general register transfer at low clock speed
-	set_frequency(speed);
 
 	transfer(cmd, cmd, sizeof(cmd));
 
@@ -923,9 +828,6 @@ uint16_t
 BMI160::read_reg16(unsigned reg)
 {
 	uint8_t cmd[3] = { (uint8_t)(reg | DIR_READ), 0, 0 };
-
-	// general register transfer at low clock speed
-	set_frequency(BMI160_LOW_BUS_SPEED);
 
 	transfer(cmd, cmd, sizeof(cmd));
 
@@ -940,9 +842,6 @@ BMI160::write_reg(unsigned reg, uint8_t value)
 	cmd[0] = reg | DIR_WRITE;
 	cmd[1] = value;
 
-	// general register transfer at low clock speed
-	set_frequency(BMI160_LOW_BUS_SPEED);
-
 	transfer(cmd, nullptr, sizeof(cmd));
 }
 
@@ -951,7 +850,7 @@ BMI160::modify_reg(unsigned reg, uint8_t clearbits, uint8_t setbits)
 {
 	uint8_t	val;
 
-	val = read_reg(reg, BMI160_LOW_BUS_SPEED);
+	val = read_reg(reg);
 	val &= ~clearbits;
 	val |= setbits;
 	write_checked_reg(reg, val);
@@ -1049,7 +948,7 @@ BMI160::set_gyro_range(unsigned max_dps)
 	} else if (max_dps <= 2000) {
 		max_gyro_dps = 2000;
 		lsb_per_dps = 16.4;
-		setbits |= BMI_GYRO_RANGE_1000_DPS;
+		setbits |= BMI_GYRO_RANGE_2000_DPS;
 
 	} else {
 		return -EINVAL;
@@ -1101,7 +1000,7 @@ BMI160::check_registers(void)
 {
 	uint8_t v;
 
-	if ((v = read_reg(_checked_registers[_checked_next], BMI160_LOW_BUS_SPEED)) !=
+	if ((v = read_reg(_checked_registers[_checked_next])) !=
 	    _checked_values[_checked_next]) {
 		_checked_bad[_checked_next] = v;
 
@@ -1167,9 +1066,7 @@ BMI160::measure()
 	 */
 	bmi_report.cmd = BMIREG_GYR_X_L | DIR_READ;
 
-	set_frequency(BMI160_LOW_BUS_SPEED);
-
-	uint8_t		status = read_reg(BMIREG_STATUS, BMI160_LOW_BUS_SPEED);
+	uint8_t		status = read_reg(BMIREG_STATUS);
 
 	if (OK != transfer((uint8_t *)&bmi_report, ((uint8_t *)&bmi_report), sizeof(bmi_report))) {
 		return;
@@ -1177,7 +1074,7 @@ BMI160::measure()
 
 	check_registers();
 
-	if ((!(status && (0x80)))  && (!(status && (0x04)))) {
+	if ((!(status & (0x80))) && (!(status & (0x04)))) {
 		perf_end(_sample_perf);
 		perf_count(_duplicates);
 		_got_duplicate = true;
@@ -1189,8 +1086,8 @@ BMI160::measure()
 	_last_accel[2] = bmi_report.accel_z;
 	_got_duplicate = false;
 
-	uint8_t temp_l = read_reg(BMIREG_TEMP_0, BMI160_LOW_BUS_SPEED);
-	uint8_t temp_h = read_reg(BMIREG_TEMP_1, BMI160_LOW_BUS_SPEED);
+	uint8_t temp_l = read_reg(BMIREG_TEMP_0);
+	uint8_t temp_h = read_reg(BMIREG_TEMP_1);
 
 	report.temp = ((temp_h << 8) + temp_l);
 
@@ -1299,6 +1196,9 @@ BMI160::measure()
 	arb.temperature_raw = report.temp;
 	arb.temperature = _last_temperature;
 
+	/* return device ID */
+	arb.device_id = _device_id.devid;
+
 	grb.x_raw = report.gyro_x;
 	grb.y_raw = report.gyro_y;
 	grb.z_raw = report.gyro_z;
@@ -1331,6 +1231,9 @@ BMI160::measure()
 
 	grb.temperature_raw = report.temp;
 	grb.temperature = _last_temperature;
+
+	/* return device ID */
+	grb.device_id = _gyro->_device_id.devid;
 
 	_accel_reports->force(&arb);
 	_gyro_reports->force(&grb);
@@ -1376,7 +1279,7 @@ BMI160::print_info()
 	::printf("checked_next: %u\n", _checked_next);
 
 	for (uint8_t i = 0; i < BMI160_NUM_CHECKED_REGISTERS; i++) {
-		uint8_t v = read_reg(_checked_registers[i], BMI160_LOW_BUS_SPEED);
+		uint8_t v = read_reg(_checked_registers[i]);
 
 		if (v != _checked_values[i]) {
 			::printf("reg %02x:%02x should be %02x\n",

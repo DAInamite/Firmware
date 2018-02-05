@@ -37,8 +37,6 @@
  *
  */
 
-#include <px4_config.h>
-
 #include <sys/types.h>
 
 #include <stdio.h>
@@ -48,13 +46,12 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include "tests.h"
+#include "tests_main.h"
 
 #include <math.h>
 #include <float.h>
 
-#include <systemlib/err.h>
-#include <unit_test/unit_test.h>
+#include <unit_test.h>
 #include <px4iofirmware/protocol.h>
 
 int test_conv(int argc, char *argv[])

@@ -37,6 +37,7 @@
  */
 
 #include <px4_config.h>
+#include <px4_defines.h>
 
 #include <sys/types.h>
 #include <stdint.h>
@@ -67,12 +68,6 @@
 
 #define ACCEL_DEVICE_PATH	"/dev/bma180"
 
-
-/* oddly, ERROR is not defined for c++ */
-#ifdef ERROR
-# undef ERROR
-#endif
-static const int ERROR = -1;
 
 #define DIR_READ			(1<<7)
 #define DIR_WRITE			(0<<7)
@@ -128,7 +123,7 @@ extern "C" { __EXPORT int bma180_main(int argc, char *argv[]); }
 class BMA180 : public device::SPI
 {
 public:
-	BMA180(int bus, spi_dev_e device);
+	BMA180(int bus, uint32_t device);
 	virtual ~BMA180();
 
 	virtual int		init();
@@ -234,7 +229,7 @@ private:
 	int			set_lowpass(unsigned frequency);
 };
 
-BMA180::BMA180(int bus, spi_dev_e device) :
+BMA180::BMA180(int bus, uint32_t device) :
 	SPI("BMA180", ACCEL_DEVICE_PATH, bus, device, SPIDEV_MODE3, 8000000),
 	_call_interval(0),
 	_reports(nullptr),
@@ -246,8 +241,7 @@ BMA180::BMA180(int bus, spi_dev_e device) :
 	_current_range(0),
 	_sample_perf(perf_alloc(PC_ELAPSED, "bma180_read"))
 {
-	// enable debug() calls
-	_debug_enabled = true;
+	_device_id.devid_s.devtype = DRV_ACC_DEVTYPE_BMA180;
 
 	// default scale factors
 	_accel_scale.x_offset = 0;
@@ -275,7 +269,7 @@ BMA180::~BMA180()
 int
 BMA180::init()
 {
-	int ret = ERROR;
+	int ret = PX4_ERROR;
 
 	/* do SPI init (and probe) first */
 	if (SPI::init() != OK) {
@@ -321,7 +315,7 @@ BMA180::init()
 		ret = OK;
 
 	} else {
-		ret = ERROR;
+		ret = PX4_ERROR;
 	}
 
 	_class_instance = register_class_devname(ACCEL_DEVICE_PATH);
@@ -477,9 +471,6 @@ BMA180::ioctl(struct file *filp, int cmd, unsigned long arg)
 			return OK;
 		}
 
-	case SENSORIOCGQUEUEDEPTH:
-		return _reports->size();
-
 	case SENSORIOCRESET:
 		/* XXX implement */
 		return -EINVAL;
@@ -489,12 +480,6 @@ BMA180::ioctl(struct file *filp, int cmd, unsigned long arg)
 
 	case ACCELIOCGSAMPLERATE:
 		return 1200;		/* always operating in low-noise mode */
-
-	case ACCELIOCSLOWPASS:
-		return set_lowpass(arg);
-
-	case ACCELIOCGLOWPASS:
-		return _current_lowpass;
 
 	case ACCELIOCSSCALE:
 		/* copy scale in */
@@ -790,7 +775,7 @@ start()
 	}
 
 	/* create the driver */
-	g_dev = new BMA180(1 /* XXX magic number */, (spi_dev_e)PX4_SPIDEV_BMA);
+	g_dev = new BMA180(1 /* XXX magic number */, PX4_SPIDEV_BMA);
 
 	if (g_dev == nullptr) {
 		goto fail;

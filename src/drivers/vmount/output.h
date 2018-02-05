@@ -42,6 +42,7 @@
 #include "common.h"
 #include <drivers/drv_hrt.h>
 #include <geo/geo.h>
+#include <uORB/uORB.h>
 #include <uORB/topics/vehicle_global_position.h>
 
 
@@ -49,10 +50,21 @@ namespace vmount
 {
 
 struct OutputConfig {
-	float gimbal_retracted_mode_value; /**< mixer output value for selecting gimbal retracted mode */
-	float gimbal_normal_mode_value; /**< mixer output value for selecting gimbal normal mode */
+	float gimbal_retracted_mode_value;	/**< Mixer output value for selecting gimbal retracted mode */
+	float gimbal_normal_mode_value;		/**< Mixer output value for selecting gimbal normal mode */
 
-	uint32_t mavlink_sys_id; /**< mavlink target system id for mavlink output */
+	/** Scale factor for pitch channel (maps from angle in radians to actuator output in [-1,1]). OutputRC only. */
+	float pitch_scale;
+	/** Scale factor for roll channel (maps from angle in radians to actuator output in [-1,1]). OutputRC only. */
+	float roll_scale;
+	/** Scale factor for yaw channel (maps from angle in radians to actuator output in [-1,1]). OutputRC only. */
+	float yaw_scale;
+
+	float pitch_offset;	/**< Offset for pitch channel in radians */
+	float roll_offset;	/**< Offset for roll channel in radians */
+	float yaw_offset;	/**< Offset for yaw channel in radians */
+
+	uint32_t mavlink_sys_id;	/**< Mavlink target system id for mavlink output */
 	uint32_t mavlink_comp_id;
 };
 
@@ -78,6 +90,9 @@ public:
 
 	/** report status to stdout */
 	virtual void print_status() = 0;
+
+	/** Publish _angle_outputs as a mount_orientation message. */
+	void publish();
 
 protected:
 	float _calculate_pitch(double lon, double lat, float altitude,
@@ -110,6 +125,7 @@ private:
 	int _vehicle_attitude_sub = -1;
 	int _vehicle_global_position_sub = -1;
 
+	orb_advert_t _mount_orientation_pub = nullptr;
 };
 
 

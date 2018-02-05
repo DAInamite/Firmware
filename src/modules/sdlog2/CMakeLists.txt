@@ -37,12 +37,11 @@ px4_add_module(
 	STACK_MAIN 1200
 	STACK_MAX 1600
 	COMPILE_FLAGS
-		${MODULE_CFLAGS}
-		-Os
+		-Wno-sign-compare # TODO: fix all sign-compare
 	SRCS
 		sdlog2.c
 		logbuffer.c
 	DEPENDS
 		platforms__common
 	)
-# vim: set noet ft=cmake fenc=utf-8 ff=unix : 
+# vim: set noet ft=cmake fenc=utf-8 ff=unix :
