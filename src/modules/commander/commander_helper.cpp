@@ -58,7 +58,7 @@
 #include <uORB/topics/led_control.h>
 #include <uORB/topics/tune_control.h>
 #include <systemlib/err.h>
-#include <systemlib/param/param.h>
+#include <parameters/param.h>
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_tone_alarm.h>
 
@@ -140,6 +140,7 @@ void buzzer_deinit()
 void set_tune_override(int tune)
 {
 	tune_control.tune_id = tune;
+	tune_control.strength = tune_control_s::STRENGTH_NORMAL;
 	tune_control.tune_override = 1;
 	tune_control.timestamp = hrt_absolute_time();
 	orb_publish(ORB_ID(tune_control), tune_control_pub, &tune_control);
@@ -154,6 +155,7 @@ void set_tune(int tune)
 		/* allow interrupting current non-repeating tune by the same tune */
 		if (tune != tune_current || new_tune_duration != 0) {
 			tune_control.tune_id = tune;
+			tune_control.strength = tune_control_s::STRENGTH_NORMAL;
 			tune_control.tune_override = 0;
 			tune_control.timestamp = hrt_absolute_time();
 			orb_publish(ORB_ID(tune_control), tune_control_pub, &tune_control);

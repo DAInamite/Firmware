@@ -77,11 +77,12 @@ px4_add_module(
 		indication_controller.cpp
 		led.cpp
 		uavcanesc_params.c
-		${PX4_SOURCE_DIR}/src/modules/systemlib/flashparams/flashparams.c
-		${PX4_SOURCE_DIR}/src/modules/systemlib/flashparams/flashfs.c
 	DEPENDS
-		platforms__common
-		uavcan
-	)
+		drivers_bootloaders
+		git_uavcan
 
-target_link_libraries(modules__uavcanesc uavcan uavcan_stm32_driver)
+		# within libuavcan
+		libuavcan_dsdlc
+		uavcan
+		uavcan_stm32_driver
+	)

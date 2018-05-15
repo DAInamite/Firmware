@@ -11,32 +11,27 @@ set(config_module_list
 	drivers/differential_pressure
 	drivers/distance_sensor
 	drivers/magnetometer
+	drivers/telemetry
 
-	drivers/device
+	drivers/batt_smbus
+	drivers/blinkm
+	drivers/camera_trigger
+	drivers/gps
+	drivers/mkblctrl
+	drivers/imu/mpu6000
+	drivers/imu/mpu9250
+	drivers/oreoled
+	drivers/pwm_input
+	drivers/pwm_out_sim
+	drivers/px4flow
+	drivers/px4fmu
+	drivers/px4io
+	drivers/rgbled
 	drivers/stm32
 	drivers/stm32/adc
 	drivers/stm32/tone_alarm
-	drivers/led
-	drivers/px4fmu
-	drivers/px4io
-	drivers/boards
-	drivers/rgbled
-	drivers/mpu6000
-	drivers/mpu9250
-	drivers/gps
-	drivers/pwm_out_sim
-	drivers/hott
-	drivers/blinkm
-	drivers/airspeed
-	drivers/frsky_telemetry
-	modules/sensors
-	drivers/mkblctrl
-	drivers/px4flow
-	drivers/oreoled
 	drivers/vmount
-	drivers/pwm_input
-	drivers/camera_trigger
-	drivers/bst
+	modules/sensors
 
 	#
 	# System commands
@@ -91,6 +86,7 @@ set(config_module_list
 	modules/attitude_estimator_q
 	modules/position_estimator_inav
 	modules/local_position_estimator
+	modules/landing_target_estimator
 	modules/ekf2
 
 	#
@@ -113,26 +109,7 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/systemlib/param
-	modules/systemlib
-	modules/uORB
 	modules/dataman
-
-	#
-	# Libraries
-	#
-	lib/controllib
-	lib/conversion
-	lib/DriverFramework/framework
-	lib/ecl
-	lib/geo
-	lib/geo_lookup
-	lib/led
-	lib/mathlib
-	lib/mixer
-	lib/terrain_estimation
-	lib/tunes
-	lib/version
 
 	#
 	# OBC challenge

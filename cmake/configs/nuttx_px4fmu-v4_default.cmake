@@ -11,25 +11,15 @@ set(config_module_list
 	drivers/differential_pressure
 	drivers/distance_sensor
 	drivers/magnetometer
+	drivers/telemetry
+	drivers/imu
 
-	drivers/airspeed
+	drivers/batt_smbus
 	drivers/blinkm
-	drivers/bma180
-	drivers/bmi055
-	drivers/bmi160
-	drivers/boards
-	drivers/bst
 	drivers/camera_trigger
-	drivers/device
-	drivers/frsky_telemetry
 	drivers/gps
-	drivers/hott
-	drivers/iridiumsbd
 	drivers/irlock
-	drivers/led
 	drivers/mkblctrl
-	drivers/mpu6000
-	drivers/mpu9250
 	drivers/oreoled
 	drivers/pca9685
 	drivers/pwm_input
@@ -101,6 +91,7 @@ set(config_module_list
 	modules/landing_target_estimator
 	modules/local_position_estimator
 	modules/position_estimator_inav
+	modules/wind_estimator
 
 	#
 	# Vehicle Control
@@ -122,27 +113,7 @@ set(config_module_list
 	#
 	# Library modules
 	#
-	modules/systemlib/param
-	modules/systemlib
-	modules/uORB
 	modules/dataman
-
-	#
-	# Libraries
-	#
-	lib/controllib
-	lib/conversion
-	lib/DriverFramework/framework
-	lib/ecl
-	lib/geo
-	lib/geo_lookup
-	lib/led
-	lib/mathlib
-	lib/mixer
-	lib/rc
-	lib/terrain_estimation
-	lib/tunes
-	lib/version
 
 	#
 	# OBC challenge
