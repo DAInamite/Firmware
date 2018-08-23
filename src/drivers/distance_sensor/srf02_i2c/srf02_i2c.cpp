@@ -66,7 +66,7 @@
 #include <unistd.h>
 #include <vector>
 
-#include <systemlib/perf_counter.h>
+#include <perf/perf_counter.h>
 #include <systemlib/err.h>
 
 #include <drivers/drv_hrt.h>
@@ -626,7 +626,7 @@ SRF02_I2C::start()
 	info.present = true;
 	info.enabled = true;
 	info.ok = true;
-	info.subsystem_type = subsystem_info_s::SUBSYSTEM_TYPE_RANGEFINDER;
+	info.subsystem_type = subsystem_info_s::SUBSYSTEM_TYPE_SENSORPROXIMITY;
 
 	static orb_advert_t pub = nullptr;
 

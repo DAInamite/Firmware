@@ -39,7 +39,7 @@ set(config_module_list
 	drivers/px4fmu
 	drivers/px4io
 	drivers/rgbled
-	drivers/srf02_i2c
+	drivers/distance_sensor/srf02_i2c
 	drivers/stm32
 	drivers/stm32/adc
 	drivers/stm32/tone_alarm
