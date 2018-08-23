@@ -94,8 +94,9 @@ int
 I2C::init()
 {
 	int ret = PX4_ERROR;
+        int ntrials = 0;
 	unsigned bus_index;
-
+in:
 	// attach to the i2c bus
 	_dev = px4_i2cbus_initialize(get_device_bus());
 
@@ -162,6 +163,12 @@ out:
 		px4_i2cbus_uninitialize(_dev);
 		_dev = nullptr;
 	}
+
+    if (ret != OK && ntrials < 10) {
+        ntrials++;
+        usleep(50000);
+        goto in;
+    }
 
 	return ret;
 }

@@ -599,7 +599,7 @@ MK::task_main()
 			orb_copy(ORB_ID(actuator_armed), _t_actuator_armed, &aa);
 
 			/* update PWM servo armed status if armed and not locked down */
-			mk_servo_arm(aa.armed && !aa.lockdown);
+			mk_servo_arm(aa.armed && !aa.lockdown && !aa.manual_lockdown);
 		}
 
 		/*
@@ -1242,7 +1242,7 @@ mk_start(unsigned motors, const char *device_path)
 
 	if (OK == g_mk->init(motors)) {
 		warnx("[mkblctrl] scanning i2c3...\n");
-		ret = g_mk->mk_check_for_blctrl(8, false, false);
+        ret = g_mk->mk_check_for_blctrl(8, true, false);
 
 		if (ret > 0) {
 			return OK;
@@ -1261,7 +1261,7 @@ mk_start(unsigned motors, const char *device_path)
 
 	if (OK == g_mk->init(motors)) {
 		warnx("[mkblctrl] scanning i2c1...\n");
-		ret = g_mk->mk_check_for_blctrl(8, false, false);
+        ret = g_mk->mk_check_for_blctrl(8, true, false);
 
 		if (ret > 0) {
 			return OK;
