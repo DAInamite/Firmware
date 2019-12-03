@@ -94,7 +94,7 @@
 class SRF02 : public device::I2C
 {
 public:
-	SRF02(uint8_t rotation = distance_sensor_s::ROTATION_DOWNWARD_FACING, int bus = SRF02_BUS_DEFAULT,
+	SRF02(uint8_t rotation = distance_sensor_s::ROTATION_DOWNWARD_FACING, uint8_t id=0, int bus = SRF02_BUS_DEFAULT,
 	      int address = SRF02_BASEADDR);
 	virtual ~SRF02();
 
@@ -113,6 +113,7 @@ protected:
 
 private:
 	uint8_t _rotation;
+        uint8_t _id;
 	float				_min_distance;
 	float				_max_distance;
 	work_s				_work{};
@@ -188,9 +189,10 @@ private:
  */
 extern "C" __EXPORT int srf02_main(int argc, char *argv[]);
 
-SRF02::SRF02(uint8_t rotation, int bus, int address) :
+SRF02::SRF02(uint8_t rotation, uint8_t id, int bus, int address) :
 	I2C("MB12xx", SRF02_DEVICE_PATH, bus, address, 100000),
 	_rotation(rotation),
+        _id(id),
 	_min_distance(SRF02_MIN_DISTANCE),
 	_max_distance(SRF02_MAX_DISTANCE),
 	_reports(nullptr),
@@ -512,8 +514,7 @@ SRF02::collect()
 	report.max_distance = get_maximum_distance();
 	report.variance = 0.0f;
 	report.signal_quality = -1;
-	/* TODO: set proper ID */
-	report.id = 0;
+	report.id = _id;
 
 	/* publish it, if we are the primary */
 	if (_distance_sensor_topic != nullptr) {
@@ -639,8 +640,8 @@ namespace srf02
 
 SRF02	*g_dev;
 
-int 	start(uint8_t rotation);
-int 	start_bus(uint8_t rotation, int i2c_bus);
+int 	start(uint8_t rotation, uint8_t id);
+int 	start_bus(uint8_t rotation, uint8_t id, int i2c_bus);
 int 	stop();
 int 	test();
 int 	reset();
@@ -656,7 +657,7 @@ int 	info();
  *
  */
 int
-start(uint8_t rotation)
+start(uint8_t rotation, uint8_t id)
 {
 	if (g_dev != nullptr) {
 		PX4_ERR("already started");
@@ -664,7 +665,7 @@ start(uint8_t rotation)
 	}
 
 	for (unsigned i = 0; i < NUM_I2C_BUS_OPTIONS; i++) {
-		if (start_bus(rotation, i2c_bus_options[i]) == PX4_OK) {
+		if (start_bus(rotation, id + i, i2c_bus_options[i]) == PX4_OK) {
 			return PX4_OK;
 		}
 	}
@@ -679,7 +680,7 @@ start(uint8_t rotation)
  * or could not be detected successfully.
  */
 int
-start_bus(uint8_t rotation, int i2c_bus)
+start_bus(uint8_t rotation, uint8_t id, int i2c_bus)
 {
 	int fd = -1;
 
@@ -689,7 +690,7 @@ start_bus(uint8_t rotation, int i2c_bus)
 	}
 
 	/* create the driver */
-	g_dev = new SRF02(rotation, i2c_bus);
+	g_dev = new SRF02(rotation, id, i2c_bus);
 
 	if (g_dev == nullptr) {
 		goto fail;
@@ -868,6 +869,7 @@ srf02_usage()
 	PX4_INFO("usage: srf02 command [options]");
 	PX4_INFO("options:");
 	PX4_INFO("\t-b --bus i2cbus (%d)", SRF02_BUS_DEFAULT);
+        PX4_INFO("\t-i --id id (%d)", 0);
 	PX4_INFO("\t-a --all");
 	PX4_INFO("\t-R --rotation (%d)", distance_sensor_s::ROTATION_DOWNWARD_FACING);
 	PX4_INFO("command:");
@@ -881,11 +883,12 @@ srf02_main(int argc, char *argv[])
 	int myoptind = 1;
 	const char *myoptarg = nullptr;
 	uint8_t rotation = distance_sensor_s::ROTATION_DOWNWARD_FACING;
+        uint8_t id = 0;
 	bool start_all = false;
 
 	int i2c_bus = SRF02_BUS_DEFAULT;
 
-	while ((ch = px4_getopt(argc, argv, "ab:R:", &myoptind, &myoptarg)) != EOF) {
+	while ((ch = px4_getopt(argc, argv, "ab:R:i:", &myoptind, &myoptarg)) != EOF) {
 		switch (ch) {
 		case 'R':
 			rotation = (uint8_t)atoi(myoptarg);
@@ -898,6 +901,10 @@ srf02_main(int argc, char *argv[])
 		case 'a':
 			start_all = true;
 			break;
+
+                case 'i':
+                        id = atoi(myoptarg);
+                        break;
 
 		default:
 			PX4_WARN("Unknown option!");
@@ -914,10 +921,10 @@ srf02_main(int argc, char *argv[])
 	 */
 	if (!strcmp(argv[myoptind], "start")) {
 		if (start_all) {
-			return srf02::start(rotation);
+			return srf02::start(rotation, id);
 
 		} else {
-			return srf02::start_bus(rotation, i2c_bus);
+			return srf02::start_bus(rotation, id, i2c_bus);
 		}
 	}
 
