@@ -89,7 +89,7 @@
 class SRF02 : public device::I2C, public px4::ScheduledWorkItem
 {
 public:
-	SRF02(uint8_t rotation = distance_sensor_s::ROTATION_DOWNWARD_FACING, int bus = SRF02_BUS_DEFAULT,
+	SRF02(uint8_t rotation = distance_sensor_s::ROTATION_DOWNWARD_FACING, uint8_t id=0, int bus = SRF02_BUS_DEFAULT,
 	      int address = SRF02_BASEADDR);
 	virtual ~SRF02();
 
@@ -108,7 +108,6 @@ protected:
 	int probe() override;
 
 private:
-
 	int collect();
 
 	int measure();
@@ -153,6 +152,7 @@ private:
 	uint8_t _cycle_counter{0};      // Initialize counter to zero - used to change i2c adresses for multiple devices.
 	uint8_t _index_counter{0};      // Initialize temp sonar i2c address to zero.
 	uint8_t _rotation;
+        uint8_t _id;
 
 	float _max_distance{SRF02_MAX_DISTANCE};
 	float _min_distance{SRF02_MIN_DISTANCE};
@@ -170,10 +170,10 @@ private:
  */
 extern "C" __EXPORT int srf02_main(int argc, char *argv[]);
 
-SRF02::SRF02(uint8_t rotation, int bus, int address) :
+SRF02::SRF02(uint8_t rotation, uint8_t id, int bus, int address) :
 	I2C("SRF02", SRF02_DEVICE_PATH, bus, address, 100000),
 	ScheduledWorkItem(MODULE_NAME, px4::device_bus_to_wq(get_device_id())),
-	_rotation(rotation)
+	_rotation(rotation), _id(id)
 {
 }
 
@@ -219,7 +219,7 @@ SRF02::collect()
 
 	struct distance_sensor_s report;
 	report.current_distance = distance_m;
-	report.id 		= 0;	// TODO: set proper ID.
+	report.id 		        = _id;
 	report.max_distance 	= _max_distance;
 	report.min_distance 	= _min_distance;
 	report.orientation 	= _rotation;
@@ -375,24 +375,6 @@ SRF02::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 	}
 }
 
-int
-SRF02::measure()
-{
-	uint8_t cmd[2];
-	cmd[0] = 0x00;
-	cmd[1] = SRF02_TAKE_RANGE_REG;
-
-	// Send the command to begin a measurement.
-	int ret = transfer(cmd, 2, nullptr, 0);
-
-	if (ret != PX4_OK) {
-		perf_count(_comms_errors);
-		PX4_DEBUG("i2c::transfer returned %d", ret);
-		return ret;
-	}
-
-	return PX4_OK;
-}
 
 void
 SRF02::print_info()
@@ -469,6 +451,34 @@ SRF02::read(device::file_t *filp, char *buffer, size_t buflen)
 
 	return ret;
 }
+
+
+int
+SRF02::measure()
+{
+
+	int ret;
+
+	/*
+	 * Send the command to begin a measurement.
+	 */
+
+	uint8_t cmd[2];
+	cmd[0] = 0x00;
+	cmd[1] = SRF02_TAKE_RANGE_REG;
+	ret = transfer(cmd, 2, nullptr, 0);
+
+	if (OK != ret) {
+		perf_count(_comms_errors);
+		PX4_DEBUG("i2c::transfer returned %d", ret);
+		return ret;
+	}
+
+	ret = OK;
+
+	return ret;
+}
+
 
 void
 SRF02::Run()
@@ -548,8 +558,8 @@ namespace srf02
 SRF02   *g_dev;
 
 int     reset();
-int     start(uint8_t rotation);
-int     start_bus(uint8_t rotation, int i2c_bus);
+int     start(uint8_t rotation, uint8_t id);
+int     start_bus(uint8_t rotation, uint8_t id, int i2c_bus);
 int     status();
 int     stop();
 int     test();
@@ -590,7 +600,7 @@ reset()
  * sensors are detected.
  */
 int
-start(uint8_t rotation)
+start(uint8_t rotation, uint8_t id)
 {
 	if (g_dev != nullptr) {
 		PX4_ERR("already started");
@@ -598,7 +608,7 @@ start(uint8_t rotation)
 	}
 
 	for (unsigned i = 0; i < NUM_I2C_BUS_OPTIONS; i++) {
-		if (start_bus(rotation, i2c_bus_options[i]) == PX4_OK) {
+		if (start_bus(rotation, id + i, i2c_bus_options[i]) == PX4_OK) {
 			return PX4_OK;
 		}
 	}
@@ -613,15 +623,15 @@ start(uint8_t rotation)
  * or could not be detected successfully.
  */
 int
-start_bus(uint8_t rotation, int i2c_bus)
+start_bus(uint8_t rotation, uint8_t id, int i2c_bus)
 {
 	if (g_dev != nullptr) {
 		PX4_ERR("already started");
 		return PX4_ERROR;
 	}
 
-	// Create the driver.
-	g_dev = new SRF02(rotation, i2c_bus);
+	/* create the driver */
+	g_dev = new SRF02(rotation, id, i2c_bus);
 
 	if (g_dev == nullptr) {
 		PX4_ERR("failed to instantiate the device");
@@ -764,6 +774,7 @@ usage()
 	PX4_INFO("usage: srf02 command [options]");
 	PX4_INFO("options:");
 	PX4_INFO("\t-b --bus i2cbus (%d)", SRF02_BUS_DEFAULT);
+        PX4_INFO("\t-i --id id (%d)", 0);
 	PX4_INFO("\t-a --all");
 	PX4_INFO("\t-R --rotation (%d)", distance_sensor_s::ROTATION_DOWNWARD_FACING);
 	PX4_INFO("command:");
@@ -786,10 +797,11 @@ extern "C" __EXPORT int srf02_main(int argc, char *argv[])
 	int i2c_bus = SRF02_BUS_DEFAULT;
 
 	uint8_t rotation = distance_sensor_s::ROTATION_DOWNWARD_FACING;
+        uint8_t id = 0;
 
 	bool start_all = false;
 
-	while ((ch = px4_getopt(argc, argv, "ab:R:", &myoptind, &myoptarg)) != EOF) {
+	while ((ch = px4_getopt(argc, argv, "ab:R:i:", &myoptind, &myoptarg)) != EOF) {
 		switch (ch) {
 		case 'R':
 			rotation = (uint8_t)atoi(myoptarg);
@@ -802,6 +814,10 @@ extern "C" __EXPORT int srf02_main(int argc, char *argv[])
 		case 'a':
 			start_all = true;
 			break;
+
+                case 'i':
+                        id = atoi(myoptarg);
+                        break;
 
 		default:
 			PX4_WARN("Unknown option!");
@@ -816,10 +832,10 @@ extern "C" __EXPORT int srf02_main(int argc, char *argv[])
 	// Start/load the driver.
 	if (!strcmp(argv[myoptind], "start")) {
 		if (start_all) {
-			return srf02::start(rotation);
+			return srf02::start(rotation, id);
 
 		} else {
-			return srf02::start_bus(rotation, i2c_bus);
+			return srf02::start_bus(rotation, id, i2c_bus);
 		}
 	}
 
