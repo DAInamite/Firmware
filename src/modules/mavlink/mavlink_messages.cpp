@@ -4261,29 +4261,34 @@ public:
 
 	unsigned get_size()
 	{
-		return _distance_sensor_sub->is_published() ? (MAVLINK_MSG_ID_DISTANCE_SENSOR_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) : 0;
+		return _distance_sensor_sub[0]->is_published() ? (MAVLINK_MSG_ID_DISTANCE_SENSOR_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) : 0;
 	}
 
 private:
-	MavlinkOrbSubscription *_distance_sensor_sub;
-	uint64_t _dist_sensor_time;
+	MavlinkOrbSubscription *_distance_sensor_sub[ORB_MULTI_MAX_INSTANCES];
+	uint64_t _dist_sensor_time[ORB_MULTI_MAX_INSTANCES];
 
 	/* do not allow top copying this class */
 	MavlinkStreamDistanceSensor(MavlinkStreamDistanceSensor &) = delete;
 	MavlinkStreamDistanceSensor &operator = (const MavlinkStreamDistanceSensor &) = delete;
 
 protected:
-	explicit MavlinkStreamDistanceSensor(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_distance_sensor_sub(_mavlink->add_orb_subscription(ORB_ID(distance_sensor))),
-		_dist_sensor_time(0)
-	{}
+	explicit MavlinkStreamDistanceSensor(Mavlink *mavlink) : MavlinkStream(mavlink)
+	{
+	    for (int i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
+	        _distance_sensor_sub[i] = _mavlink->add_orb_subscription(ORB_ID(distance_sensor), i);
+	        _dist_sensor_time[i] = 0;
+	    }
+	}
 
 	bool send(const hrt_abstime t)
 	{
 		distance_sensor_s dist_sensor;
+		bool updated = false;
 
-		if (_distance_sensor_sub->update(&_dist_sensor_time, &dist_sensor)) {
-			mavlink_distance_sensor_t msg = {};
+        for (int i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
+		    if (_distance_sensor_sub[i]->update(&_dist_sensor_time[i], &dist_sensor)) {
+			    mavlink_distance_sensor_t msg = {};
 
 			msg.time_boot_ms = dist_sensor.timestamp / 1000; /* us to ms */
 
@@ -4315,10 +4320,11 @@ protected:
 
 			mavlink_msg_distance_sensor_send_struct(_mavlink->get_channel(), &msg);
 
-			return true;
+			updated = true;
+                        }
 		}
 
-		return false;
+		return updated;
 	}
 };
 
