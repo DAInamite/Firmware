@@ -74,14 +74,14 @@
 #define SRF02_DEVICE_PATH			"/dev/srf02"
 
 /* SRF02 Registers addresses */
-#define SRF02_TAKE_RANGE_REG			0x51	// Measure range Register.
+#define SRF02_TAKE_RANGE_REG			0x50	// Measure range Register.  0x50 result in inches, 0x51 result in centimeters
 #define SRF02_SET_ADDRESS_0			0xA0	// Change address 0 Register.
 #define SRF02_SET_ADDRESS_1			0xAA	// Change address 1 Register.
 #define SRF02_SET_ADDRESS_2			0xA5	// Change address 2 Register.
 
 /* Device limits */
 #define SRF02_MIN_DISTANCE 			(0.20f)
-#define SRF02_MAX_DISTANCE 			(7.65f)
+#define SRF02_MAX_DISTANCE 			(6.47f)  // 255 inches
 
 #define SRF02_CONVERSION_INTERVAL 		100000	// 60ms for one sonar.
 #define SRF02_INTERVAL_BETWEEN_SUCCESIVE_FIRES 	100000	// 30ms between each sonar measurement (watch out for interference!).
@@ -214,8 +214,8 @@ SRF02::collect()
 		return ret;
 	}
 
-	uint16_t distance_cm = val[0] << 8 | val[1];
-	float distance_m = float(distance_cm) * 1e-2f;
+	uint16_t distance_inch = val[0] << 8 | val[1];
+	float distance_m = float(distance_inch) * 0.0254f;
 
 	struct distance_sensor_s report;
 	report.current_distance = distance_m;
